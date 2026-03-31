@@ -17,7 +17,9 @@ from database.database import add_user, full_userbase, present_user
 async def start_command(client: Client, message: Message):
 
     # 🔒 FORCE SUB CHECK
-    is_joined = await subscribed(client, message)
+    from helper_func import check_sub
+
+is_joined = await check_sub(None, client, message)
 
     if not is_joined:
         buttons = []
