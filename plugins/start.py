@@ -11,20 +11,43 @@ from bot import Bot
 from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, DISABLE_CHANNEL_BUTTON, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG, JOIN_REQUEST_ENABLE, FORCE_SUB_CHANNELS
 from helper_func import decode, get_messages, delete_file
 from database.database import add_user, del_user, full_userbase, present_user
+from pyrogram.errors import UserNotParticipant
 
 
-# 🔒 FORCE SUB FUNCTION (ADDED ONLY)
-async def is_joined(client, user_id):
-    try:
-        for ch in FORCE_SUB_CHANNELS:
-            member = await client.get_chat_member(ch, user_id)
+# 🔒 FORCE SUB CHECK FINAL FIX
+if FORCE_SUB_CHANNELS:
+    not_joined_channels = []
+
+    for ch in FORCE_SUB_CHANNELS:
+        try:
+            member = await client.get_chat_member(ch, id)
             if member.status in ["left", "kicked"]:
-                return False
-        return True
-    except UserNotParticipant:
-        return False
-    except:
-        return True
+                not_joined_channels.append(ch)
+        except:
+            not_joined_channels.append(ch)
+
+    if not_joined_channels:
+
+        buttons = []
+
+        for ch in not_joined_channels:
+            try:
+                invite = await client.create_chat_invite_link(
+                    chat_id=ch,
+                    creates_join_request=True
+                )
+                link = invite.invite_link
+            except:
+                link = client.invitelink
+
+            buttons.append(
+                [InlineKeyboardButton("📢 Join Channel", url=link)]
+            )
+
+        return await message.reply(
+            "🚫 पहले सभी channels join करो फिर file मिलेगी",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
 
 
 @Bot.on_message(filters.command('start') & filters.private)
