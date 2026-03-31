@@ -16,7 +16,7 @@ from database.database import add_user, full_userbase, present_user
 @Bot.on_message(filters.command('start') & filters.private)
 async def start_command(client: Client, message: Message):
 
-    # 🔒 FORCE SUB CHECK (TOP)
+    # 🔒 FORCE SUB CHECK (FIXED)
     is_joined = await check_sub(None, client, message)
 
     if not is_joined:
@@ -124,7 +124,7 @@ async def start_command(client: Client, message: Message):
         )
 
 
-# 🔥 VERIFY BUTTON
+# 🔥 VERIFY BUTTON FIXED
 @Bot.on_callback_query(filters.regex("checksub"))
 async def verify_sub(client, query):
 
