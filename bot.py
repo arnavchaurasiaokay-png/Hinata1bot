@@ -12,7 +12,7 @@ import os  # ✅ added
 
 from config import API_HASH, APP_ID, LOGGER, TG_BOT_TOKEN, TG_BOT_WORKERS, FORCE_SUB_CHANNEL, CHANNEL_ID
 
-# ✅ Railway PORT fix
+# ✅ Railway dynamic PORT
 PORT = int(os.environ.get("PORT", 8080))
 
 
@@ -43,7 +43,7 @@ class Bot(Client):
         usr_bot_me = await self.get_me()
         self.uptime = datetime.now()
 
-        # ---------------- FORCE SUB ---------------- #
+        # -------- FORCE SUB -------- #
         if FORCE_SUB_CHANNEL:
             try:
                 link = (await self.get_chat(FORCE_SUB_CHANNEL)).invite_link
@@ -56,7 +56,7 @@ class Bot(Client):
                 self.LOGGER(__name__).warning("Bot can't Export Invite link!")
                 sys.exit()
 
-        # ---------------- DB CHANNEL ---------------- #
+        # -------- DB CHANNEL -------- #
         try:
             db_channel = await self.get_chat(CHANNEL_ID)
             self.db_channel = db_channel
@@ -73,21 +73,12 @@ class Bot(Client):
         print("Welcome to CodeXBotz File Sharing Bot")
         self.username = usr_bot_me.username
 
-        # ---------------- WEB SERVER ---------------- #
+        # -------- WEB SERVER -------- #
         app = web.AppRunner(await web_server())
         await app.setup()
 
         bind_address = "0.0.0.0"
-
-        # ✅ Add Ping Route (VERY IMPORTANT)
-        async def home(request):
-            return web.Response(text="Bot Alive ✅")
-
-        site = web.TCPSite(app, bind_address, PORT)
-        await site.start()
-
-        # Add route AFTER app creation
-        app._app.router.add_get("/", home)
+        await web.TCPSite(app, bind_address, PORT).start()
 
     async def stop(self, *args):
         await super().stop()
