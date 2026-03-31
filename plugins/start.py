@@ -1,44 +1,21 @@
 #(©)CodeXBotz
 
+import os
 import asyncio
 from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
 
 from bot import Bot
-from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG
-from helper_func import check_sub, decode, get_messages, delete_file
-from database.database import add_user, full_userbase, present_user
+from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, DISABLE_CHANNEL_BUTTON, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG, JOIN_REQUEST_ENABLE, FORCE_SUB_CHANNEL
+from helper_func import subscribed, decode, get_messages, delete_file
+from database.database import add_user, del_user, full_userbase, present_user
 
 
-@Bot.on_message(filters.command('start') & filters.private)
+@Bot.on_message(filters.command('start') & filters.private & subscribed)
 async def start_command(client: Client, message: Message):
 
-    # 🔒 FORCE SUB (unchanged)
-    is_joined = await check_sub(None, client, message)
-
-    if not is_joined:
-        buttons = []
-
-        for i, link in enumerate(client.invitelinks):
-            buttons.append(
-                [InlineKeyboardButton(f"📢 Join Channel {i+1}", url=link)]
-            )
-
-        buttons.append(
-            [InlineKeyboardButton("✅ Verify", callback_data="checksub")]
-        )
-
-        await message.reply(
-            text="🚫 Please join all channels then click VERIFY",
-            reply_markup=InlineKeyboardMarkup(buttons),
-            quote=True
-        )
-        return
-
-
-    # ✅ USER SAVE
     user_id = message.from_user.id
 
     if not await present_user(user_id):
@@ -49,8 +26,7 @@ async def start_command(client: Client, message: Message):
 
     text = message.text
 
-    # 🔗 FILE LINK SYSTEM
-    if len(text) > 7:
+    if len(text)>7:
         try:
             base64_string = text.split(" ", 1)[1]
         except:
@@ -60,12 +36,28 @@ async def start_command(client: Client, message: Message):
         argument = string.split("-")
 
         if len(argument) == 3:
-            start = int(int(argument[1]) / abs(client.db_channel.id))
-            end = int(int(argument[2]) / abs(client.db_channel.id))
-            ids = range(start, end+1)
+            try:
+                start = int(int(argument[1]) / abs(client.db_channel.id))
+                end = int(int(argument[2]) / abs(client.db_channel.id))
+            except:
+                return
+
+            if start <= end:
+                ids = range(start,end+1)
+            else:
+                ids = []
+                i = start
+                while True:
+                    ids.append(i)
+                    i -= 1
+                    if i < end:
+                        break
 
         elif len(argument) == 2:
-            ids = [int(int(argument[1]) / abs(client.db_channel.id))]
+            try:
+                ids = [int(int(argument[1]) / abs(client.db_channel.id))]
+            except:
+                return
 
         temp_msg = await message.reply("Please wait...")
 
@@ -77,44 +69,53 @@ async def start_command(client: Client, message: Message):
 
         await temp_msg.delete()
 
-        # 🔥 FIX: NO BUTTON COPY
+        track_msgs = []
+
         for msg in messages:
+
+            if bool(CUSTOM_CAPTION) and msg.document:
+                caption = CUSTOM_CAPTION.format(
+                    previouscaption="" if not msg.caption else msg.caption.html,
+                    filename=msg.document.file_name
+                )
+            else:
+                caption = "" if not msg.caption else msg.caption.html
+
+            # 🔥 FINAL FIX (NO BUTTON TO USER)
             try:
-                file_id = None
+                sent = await client.send_cached_media(
+                    chat_id=user_id,
+                    file_id=msg.file_id,
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                    protect_content=PROTECT_CONTENT
+                )
 
-                if msg.document:
-                    file_id = msg.document.file_id
-                elif msg.video:
-                    file_id = msg.video.file_id
-                elif msg.audio:
-                    file_id = msg.audio.file_id
-                elif msg.photo:
-                    file_id = msg.photo.file_id[-1].file_id
+                if AUTO_DELETE_TIME and AUTO_DELETE_TIME > 0 and sent:
+                    track_msgs.append(sent)
 
-                caption = msg.caption.html if msg.caption else ""
-
-                if file_id:
-                    await client.send_cached_media(
-                        chat_id=message.from_user.id,
-                        file_id=file_id,
-                        caption=caption,
-                        parse_mode=ParseMode.HTML,
-                        protect_content=PROTECT_CONTENT
-                    )
+                await asyncio.sleep(0.5)
 
             except FloodWait as e:
                 await asyncio.sleep(e.value)
+                continue
             except:
                 continue
+
+        if track_msgs:
+            delete_data = await client.send_message(
+                chat_id=user_id,
+                text=AUTO_DELETE_MSG.format(time=AUTO_DELETE_TIME)
+            )
+            asyncio.create_task(delete_file(track_msgs, client, delete_data))
 
         return
 
 
-    # 🏠 NORMAL START (unchanged)
     reply_markup = InlineKeyboardMarkup(
         [[
-            InlineKeyboardButton("😊 About Me", callback_data="about"),
-            InlineKeyboardButton("🔒 Close", callback_data="close")
+            InlineKeyboardButton("😊 About Me", callback_data = "about"),
+            InlineKeyboardButton("🔒 Close", callback_data = "close")
         ]]
     )
 
@@ -124,7 +125,7 @@ async def start_command(client: Client, message: Message):
             caption=START_MSG.format(
                 first=message.from_user.first_name,
                 last=message.from_user.last_name,
-                username='@' + message.from_user.username if message.from_user.username else None,
+                username=None if not message.from_user.username else '@' + message.from_user.username,
                 mention=message.from_user.mention,
                 id=message.from_user.id
             ),
@@ -136,25 +137,49 @@ async def start_command(client: Client, message: Message):
             text=START_MSG.format(
                 first=message.from_user.first_name,
                 last=message.from_user.last_name,
-                username='@' + message.from_user.username if message.from_user.username else None,
+                username=None if not message.from_user.username else '@' + message.from_user.username,
                 mention=message.from_user.mention,
                 id=message.from_user.id
             ),
             reply_markup=reply_markup,
+            disable_web_page_preview=True,
             quote=True
         )
 
 
-@Bot.on_callback_query(filters.regex("checksub"))
-async def verify_sub(client, query):
+# 🔒 NOT JOINED (UNCHANGED)
+@Bot.on_message(filters.command('start') & filters.private)
+async def not_joined(client: Client, message: Message):
 
-    is_joined = await check_sub(None, client, query.message)
+    if bool(JOIN_REQUEST_ENABLE):
+        invite = await client.create_chat_invite_link(
+            chat_id=FORCE_SUB_CHANNEL,
+            creates_join_request=True
+        )
+        ButtonUrl = invite.invite_link
+    else:
+        ButtonUrl = client.invitelink
 
-    if not is_joined:
-        await query.answer("❌ You didn't join all channels", show_alert=True)
-        return
+    buttons = [[InlineKeyboardButton("Join Channel", url=ButtonUrl)]]
 
-    await query.answer("✅ Verified! Send /start again", show_alert=True)
+    try:
+        buttons.append(
+            [InlineKeyboardButton("Try Again", url=f"https://t.me/{client.username}?start={message.command[1]}")]
+        )
+    except:
+        pass
+
+    await message.reply(
+        text=FORCE_MSG.format(
+            first=message.from_user.first_name,
+            last=message.from_user.last_name,
+            username=None if not message.from_user.username else '@' + message.from_user.username,
+            mention=message.from_user.mention,
+            id=message.from_user.id
+        ),
+        reply_markup=InlineKeyboardMarkup(buttons),
+        quote=True
+    )
 
 
 @Bot.on_message(filters.command('users') & filters.private & filters.user(ADMINS))
