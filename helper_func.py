@@ -10,30 +10,29 @@ from pyrogram.errors import FloodWait
 from pyrogram.errors.exceptions.bad_request_400 import UserNotParticipant
 
 
-# 🔒 FORCE SUB CHECK (FINAL FIX)
-async def is_subscribed(filter, client, message):
+# 🔒 FORCE SUB CHECK (REAL FUNCTION)
+async def check_sub(_, client, message):
 
-    # अगर कोई channel set नहीं है → allow
+    # No channels → allow
     if not FORCE_SUB_CHANNELS:
         return True
 
-    # safety check
     user = message.from_user
     if not user:
         return False
 
     user_id = user.id
 
-    # admin bypass
+    # Admin bypass
     if user_id in ADMINS:
         return True
 
-    # 🔥 check all channels strictly
+    # 🔥 Check ALL channels
     for ch in FORCE_SUB_CHANNELS:
         try:
             member = await client.get_chat_member(ch, user_id)
 
-            # ❌ अगर user joined नहीं है
+            # अगर user joined नहीं है
             if member.status in [
                 ChatMemberStatus.LEFT,
                 ChatMemberStatus.BANNED
@@ -48,6 +47,10 @@ async def is_subscribed(filter, client, message):
             return False
 
     return True
+
+
+# 🔗 FILTER (optional use)
+subscribed = filters.create(check_sub)
 
 
 # 🔐 ENCODE
@@ -126,7 +129,7 @@ async def get_message_id(client, message):
     return 0
 
 
-# ⏱ UPTIME FORMAT
+# ⏱ TIME FORMAT
 def get_readable_time(seconds: int) -> str:
     count = 0
     up_time = ""
@@ -154,7 +157,7 @@ def get_readable_time(seconds: int) -> str:
     return up_time
 
 
-# 🗑 AUTO DELETE FILE
+# 🗑 AUTO DELETE
 async def delete_file(messages, client, process):
     await asyncio.sleep(AUTO_DELETE_TIME)
 
@@ -169,7 +172,3 @@ async def delete_file(messages, client, process):
             print(f"Failed to delete {msg.id}: {e}")
 
     await process.edit_text(AUTO_DEL_SUCCESS_MSG)
-
-
-# 🔗 FILTER
-subscribed = filters.create(is_subscribed)
