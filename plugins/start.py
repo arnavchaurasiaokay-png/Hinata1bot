@@ -32,11 +32,47 @@ async def is_joined(client, user_id):
 @Bot.on_message(filters.command('start') & filters.private)
 async def start_command(client: Client, message: Message):
     id = message.from_user.id
+
     if not await present_user(id):
         try:
             await add_user(id)
         except:
             pass
+
+    # 🔒 FORCE SUB CHECK (ADDED)
+    if FORCE_SUB_CHANNELS:
+        joined = await is_joined(client, message.from_user.id)
+        if not joined:
+            buttons = []
+
+            for ch in FORCE_SUB_CHANNELS:
+                try:
+                    invite = await client.create_chat_invite_link(ch)
+                    buttons.append(
+                        [InlineKeyboardButton("Join Channel", url=invite.invite_link)]
+                    )
+                except:
+                    pass
+
+            try:
+                buttons.append(
+                    [InlineKeyboardButton("🔄 Try Again", url=f"https://t.me/{client.username}?start={message.text.split(' ',1)[1]}")]
+                )
+            except:
+                pass
+
+            return await message.reply(
+                FORCE_MSG.format(
+                    first=message.from_user.first_name,
+                    last=message.from_user.last_name,
+                    username=None if not message.from_user.username else '@' + message.from_user.username,
+                    mention=message.from_user.mention,
+                    id=message.from_user.id
+                ),
+                reply_markup=InlineKeyboardMarkup(buttons),
+                disable_web_page_preview=True
+            )
+        
     text = message.text
     if len(text)>7:
         try:
@@ -175,52 +211,6 @@ WAIT_MSG = """"<b>Processing ...</b>"""
 REPLY_ERROR = """<code>Use this command as a replay to any telegram message with out any spaces.</code>"""
 
 #=====================================================================================##
-
-
-@Bot.on_message(filters.command('start') & filters.private)
-async def not_joined(client: Client, message: Message):
-
-    if bool(JOIN_REQUEST_ENABLE):
-        invite = await client.create_chat_invite_link(
-            chat_id=FORCE_SUB_CHANNEL,
-            creates_join_request=True
-        )
-        ButtonUrl = invite.invite_link
-    else:
-        ButtonUrl = client.invitelink
-
-    buttons = [
-        [
-            InlineKeyboardButton(
-                "Join Channel",
-                url = ButtonUrl)
-        ]
-    ]
-
-    try:
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    text = 'Try Again',
-                    url = f"https://t.me/{client.username}?start={message.command[1]}"
-                )
-            ]
-        )
-    except IndexError:
-        pass
-
-    await message.reply(
-        text = FORCE_MSG.format(
-                first = message.from_user.first_name,
-                last = message.from_user.last_name,
-                username = None if not message.from_user.username else '@' + message.from_user.username,
-                mention = message.from_user.mention,
-                id = message.from_user.id
-            ),
-        reply_markup = InlineKeyboardMarkup(buttons),
-        quote = True,
-        disable_web_page_preview = True
-    )
 
 @Bot.on_message(filters.command('users') & filters.private & filters.user(ADMINS))
 async def get_users(client: Bot, message: Message):
