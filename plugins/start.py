@@ -8,29 +8,25 @@ from pyrogram.errors import FloodWait
 
 from bot import Bot
 from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG
-from helper_func import subscribed, decode, get_messages, delete_file
+from helper_func import check_sub, decode, get_messages, delete_file
 from database.database import add_user, full_userbase, present_user
 
 
-# 🔥 START COMMAND (MAIN)
+# 🔥 START COMMAND
 @Bot.on_message(filters.command('start') & filters.private)
 async def start_command(client: Client, message: Message):
 
-    # 🔒 FORCE SUB CHECK
-    from helper_func import check_sub
-
-is_joined = await check_sub(None, client, message)
+    # 🔒 FORCE SUB CHECK (TOP)
+    is_joined = await check_sub(None, client, message)
 
     if not is_joined:
         buttons = []
 
-        # join buttons
         for i, link in enumerate(client.invitelinks):
             buttons.append(
                 [InlineKeyboardButton(f"📢 Join Channel {i+1}", url=link)]
             )
 
-        # verify button
         buttons.append(
             [InlineKeyboardButton("✅ Verify", callback_data="checksub")]
         )
@@ -67,7 +63,7 @@ is_joined = await check_sub(None, client, message)
         if len(argument) == 3:
             start = int(int(argument[1]) / abs(client.db_channel.id))
             end = int(int(argument[2]) / abs(client.db_channel.id))
-            ids = range(start, end+1) if start <= end else list(range(start, end-1, -1))
+            ids = range(start, end+1)
 
         elif len(argument) == 2:
             ids = [int(int(argument[1]) / abs(client.db_channel.id))]
@@ -82,49 +78,18 @@ is_joined = await check_sub(None, client, message)
 
         await temp_msg.delete()
 
-        track_msgs = []
-
         for msg in messages:
-
-            if CUSTOM_CAPTION and msg.document:
-                caption = CUSTOM_CAPTION.format(
-                    previouscaption="" if not msg.caption else msg.caption.html,
-                    filename=msg.document.file_name
-                )
-            else:
-                caption = "" if not msg.caption else msg.caption.html
-
-            try:
-                copied = await msg.copy(
-                    chat_id=message.from_user.id,
-                    caption=caption,
-                    parse_mode=ParseMode.HTML,
-                    protect_content=PROTECT_CONTENT
-                )
-
-                if AUTO_DELETE_TIME and AUTO_DELETE_TIME > 0:
-                    track_msgs.append(copied)
-
-            except FloodWait as e:
-                await asyncio.sleep(e.value)
-                copied = await msg.copy(
-                    chat_id=message.from_user.id,
-                    caption=caption,
-                    parse_mode=ParseMode.HTML,
-                    protect_content=PROTECT_CONTENT
-                )
-
-        if track_msgs:
-            delete_data = await client.send_message(
+            await msg.copy(
                 chat_id=message.from_user.id,
-                text=AUTO_DELETE_MSG.format(time=AUTO_DELETE_TIME)
+                caption=msg.caption.html if msg.caption else "",
+                parse_mode=ParseMode.HTML,
+                protect_content=PROTECT_CONTENT
             )
-            asyncio.create_task(delete_file(track_msgs, client, delete_data))
 
         return
 
 
-    # 🏠 NORMAL START MESSAGE
+    # 🏠 NORMAL START
     reply_markup = InlineKeyboardMarkup(
         [[
             InlineKeyboardButton("😊 About Me", callback_data="about"),
@@ -159,11 +124,11 @@ is_joined = await check_sub(None, client, message)
         )
 
 
-# 🔥 VERIFY BUTTON HANDLER (MOST IMPORTANT)
+# 🔥 VERIFY BUTTON
 @Bot.on_callback_query(filters.regex("checksub"))
 async def verify_sub(client, query):
 
-    is_joined = await subscribed(client, query.message)
+    is_joined = await check_sub(None, client, query.message)
 
     if not is_joined:
         await query.answer("❌ You didn't join all channels", show_alert=True)
