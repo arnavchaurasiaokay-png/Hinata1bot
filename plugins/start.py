@@ -4,49 +4,43 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import FloodWait, UserNotParticipant
+from pyrogram.errors import FloodWait
 
 from bot import Bot
-from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG, FORCE_SUB_CHANNEL
-from helper_func import decode, get_messages
+from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG
+from helper_func import check_sub, decode, get_messages, delete_file
 from database.database import add_user, full_userbase, present_user
 
 
-# 🔥 FORCE SUB FUNCTION (FINAL FIX)
-async def is_subscribed(client, user_id):
-    try:
-        await client.get_chat_member(FORCE_SUB_CHANNEL, user_id)
-        return True
-    except UserNotParticipant:
-        return False
-    except Exception:
-        return True
-
-
-# 🔥 START COMMAND
 @Bot.on_message(filters.command('start') & filters.private)
 async def start_command(client: Client, message: Message):
 
-    user_id = message.from_user.id
+    # 🔒 FORCE SUB (unchanged)
+    is_joined = await check_sub(None, client, message)
 
-    # 🔒 FORCE SUB CHECK (FIXED)
-    if FORCE_SUB_CHANNEL:
-        if not await is_subscribed(client, user_id):
+    if not is_joined:
+        buttons = []
 
-            buttons = [
-                [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{FORCE_SUB_CHANNEL}")],
-                [InlineKeyboardButton("✅ Verify", callback_data="checksub")]
-            ]
-
-            await message.reply(
-                text="🚫 Please join our channel first then click VERIFY",
-                reply_markup=InlineKeyboardMarkup(buttons),
-                quote=True
+        for i, link in enumerate(client.invitelinks):
+            buttons.append(
+                [InlineKeyboardButton(f"📢 Join Channel {i+1}", url=link)]
             )
-            return
+
+        buttons.append(
+            [InlineKeyboardButton("✅ Verify", callback_data="checksub")]
+        )
+
+        await message.reply(
+            text="🚫 Please join all channels then click VERIFY",
+            reply_markup=InlineKeyboardMarkup(buttons),
+            quote=True
+        )
+        return
 
 
     # ✅ USER SAVE
+    user_id = message.from_user.id
+
     if not await present_user(user_id):
         try:
             await add_user(user_id)
@@ -83,7 +77,7 @@ async def start_command(client: Client, message: Message):
 
         await temp_msg.delete()
 
-        # 🔥 MAIN FIX (NO BUTTON COPY)
+        # 🔥 FIX: NO BUTTON COPY
         for msg in messages:
             try:
                 file_id = None
@@ -101,7 +95,7 @@ async def start_command(client: Client, message: Message):
 
                 if file_id:
                     await client.send_cached_media(
-                        chat_id=user_id,
+                        chat_id=message.from_user.id,
                         file_id=file_id,
                         caption=caption,
                         parse_mode=ParseMode.HTML,
@@ -110,13 +104,13 @@ async def start_command(client: Client, message: Message):
 
             except FloodWait as e:
                 await asyncio.sleep(e.value)
-            except Exception:
+            except:
                 continue
 
         return
 
 
-    # 🏠 NORMAL START
+    # 🏠 NORMAL START (unchanged)
     reply_markup = InlineKeyboardMarkup(
         [[
             InlineKeyboardButton("😊 About Me", callback_data="about"),
@@ -151,22 +145,18 @@ async def start_command(client: Client, message: Message):
         )
 
 
-# 🔥 VERIFY BUTTON (FIXED)
 @Bot.on_callback_query(filters.regex("checksub"))
 async def verify_sub(client, query):
 
-    user_id = query.from_user.id
+    is_joined = await check_sub(None, client, query.message)
 
-    if FORCE_SUB_CHANNEL:
-        if not await is_subscribed(client, user_id):
-            await query.answer("❌ Join channel first", show_alert=True)
-            return
+    if not is_joined:
+        await query.answer("❌ You didn't join all channels", show_alert=True)
+        return
 
-    await query.message.edit("✅ Verified! Now send /start again")
-    await query.answer()
+    await query.answer("✅ Verified! Send /start again", show_alert=True)
 
 
-# 👥 USERS
 @Bot.on_message(filters.command('users') & filters.private & filters.user(ADMINS))
 async def get_users(client: Bot, message: Message):
     users = await full_userbase()
