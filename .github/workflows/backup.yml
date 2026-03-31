@@ -2,8 +2,8 @@ name: Mongo Backup
 
 on:
   schedule:
-    - cron: '0 3 * * *'   # Roz 3 baje run hoga
-  workflow_dispatch:       # Manual run option bhi milega
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 jobs:
   backup:
@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install MongoDB Tools
         run: sudo apt-get update && sudo apt-get install -y mongodb-database-tools
@@ -26,7 +26,7 @@ jobs:
         run: zip -r backup.zip backup
 
       - name: Upload Backup
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mongodb-backup
           path: backup.zip
