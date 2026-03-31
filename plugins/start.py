@@ -7,46 +7,54 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 
 from bot import Bot
-from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG
+from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, DISABLE_CHANNEL_BUTTON, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG, JOIN_REQUEST_ENABLE, FORCE_SUB_CHANNELS
 from helper_func import subscribed, decode, get_messages, delete_file
 from database.database import add_user, full_userbase, present_user
 
 
-@Bot.on_message(filters.command('start') & filters.private)
-async def start_command(client: Client, message: Message):
+# 🔒 FORCE SUB (NOT JOINED USERS)
+@Bot.on_message(filters.command('start') & filters.private & ~subscribed)
+async def not_joined(client: Client, message: Message):
 
-    # 🔒 FORCE SUB CHECK (MAIN FIX)
-    is_joined = await subscribed(client, message)
+    buttons = []
 
-    if not is_joined:
-        buttons = []
-
-        for i, link in enumerate(client.invitelinks):
-            buttons.append(
-                [InlineKeyboardButton(f"📢 Join Channel {i+1}", url=link)]
-            )
-
-        await message.reply(
-            text=FORCE_MSG.format(
-                first=message.from_user.first_name,
-                last=message.from_user.last_name,
-                username='@' + message.from_user.username if message.from_user.username else None,
-                mention=message.from_user.mention,
-                id=message.from_user.id
-            ),
-            reply_markup=InlineKeyboardMarkup(buttons),
-            disable_web_page_preview=True,
-            quote=True
+    for i, link in enumerate(client.invitelinks):
+        buttons.append(
+            [InlineKeyboardButton(f"📢 Join Channel {i+1}", url=link)]
         )
-        return   # ❌ STOP HERE (NO BYPASS)
+
+    try:
+        buttons.append(
+            [InlineKeyboardButton(
+                "🔄 Try Again",
+                url=f"https://t.me/{client.username}?start={message.command[1]}"
+            )]
+        )
+    except:
+        pass
+
+    await message.reply(
+        text=FORCE_MSG.format(
+            first=message.from_user.first_name,
+            last=message.from_user.last_name,
+            username='@' + message.from_user.username if message.from_user.username else None,
+            mention=message.from_user.mention,
+            id=message.from_user.id
+        ),
+        reply_markup=InlineKeyboardMarkup(buttons),
+        disable_web_page_preview=True,
+        quote=True
+    )
 
 
-    # ✅ USER ADD
-    user_id = message.from_user.id
+# ✅ MAIN START (ONLY FOR JOINED USERS)
+@Bot.on_message(filters.command('start') & filters.private & subscribed)
+async def start_command(client: Client, message: Message):
+    id = message.from_user.id
 
-    if not await present_user(user_id):
+    if not await present_user(id):
         try:
-            await add_user(user_id)
+            await add_user(id)
         except:
             pass
 
@@ -92,11 +100,14 @@ async def start_command(client: Client, message: Message):
             else:
                 caption = "" if not msg.caption else msg.caption.html
 
+            reply_markup = None
+
             try:
                 copied = await msg.copy(
                     chat_id=message.from_user.id,
                     caption=caption,
                     parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
                     protect_content=PROTECT_CONTENT
                 )
 
@@ -109,8 +120,11 @@ async def start_command(client: Client, message: Message):
                     chat_id=message.from_user.id,
                     caption=caption,
                     parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
                     protect_content=PROTECT_CONTENT
                 )
+                if AUTO_DELETE_TIME:
+                    track_msgs.append(copied)
 
         if track_msgs:
             delete_data = await client.send_message(
@@ -121,8 +135,7 @@ async def start_command(client: Client, message: Message):
 
         return
 
-
-    # 🏠 START MESSAGE
+    # 🏠 NORMAL START MESSAGE
     reply_markup = InlineKeyboardMarkup(
         [[
             InlineKeyboardButton("😊 About Me", callback_data="about"),
