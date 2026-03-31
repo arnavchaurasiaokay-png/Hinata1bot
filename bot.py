@@ -4,6 +4,9 @@ from aiohttp import web
 from plugins import web_server
 
 import pyromod.listen
+import asyncio
+import re
+
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 import sys
@@ -21,6 +24,7 @@ ascii_art = """
 ░╚════╝░░╚════╝░╚═════╝░╚══════╝╚═╝░░╚═╝╚═════╝░░╚════╝░░░░╚═╝░░░╚══════╝
 """
 
+
 class Bot(Client):
     def __init__(self):
         super().__init__(
@@ -34,7 +38,20 @@ class Bot(Client):
         self.LOGGER = LOGGER
 
     async def start(self):
-        await super().start()
+
+        # ✅ FLOODWAIT AUTO HANDLE
+        while True:
+            try:
+                await super().start()
+                break
+            except Exception as e:
+                if "FloodWait" in str(e):
+                    wait_time = int(re.search(r'\d+', str(e)).group())
+                    print(f"⏳ FloodWait detected → sleeping {wait_time} sec...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise e
+
         usr_bot_me = await self.get_me()
         self.uptime = datetime.now()
 
@@ -72,6 +89,7 @@ class Bot(Client):
             sys.exit()
 
         self.set_parse_mode(ParseMode.HTML)
+
         self.LOGGER(__name__).info(
             f"Bot Running..!\n\nCreated by \nhttps://t.me/CodeXBotz"
         )
@@ -81,7 +99,7 @@ class Bot(Client):
 
         self.username = usr_bot_me.username
 
-        # 🌐 Web server
+        # 🌐 Web server (KEEP ALIVE)
         app = web.AppRunner(await web_server())
         await app.setup()
         bind_address = "0.0.0.0"
