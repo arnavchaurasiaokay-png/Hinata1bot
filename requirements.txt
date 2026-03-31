@@ -9,4 +9,3 @@ dnspython
 # --- For-Web-Response ------- #
 flask
 aiohttp
-motor
