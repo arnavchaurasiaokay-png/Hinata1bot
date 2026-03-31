@@ -10,33 +10,33 @@ from pyrogram.errors import FloodWait
 from pyrogram.errors.exceptions.bad_request_400 import UserNotParticipant
 
 
-# 🔒 MULTIPLE FORCE SUB CHECK (FIXED)
+# 🔒 FORCE SUB CHECK (FINAL FIX)
 async def is_subscribed(filter, client, message):
 
-    # No force sub → allow
+    # अगर कोई channel set नहीं है → allow
     if not FORCE_SUB_CHANNELS:
         return True
 
-    # Safety check
+    # safety check
     user = message.from_user
     if not user:
         return False
 
     user_id = user.id
 
-    # Admin bypass
+    # admin bypass
     if user_id in ADMINS:
         return True
 
-    # 🔒 Check ALL channels properly
+    # 🔥 check all channels strictly
     for ch in FORCE_SUB_CHANNELS:
         try:
             member = await client.get_chat_member(ch, user_id)
 
-            if member.status not in [
-                ChatMemberStatus.OWNER,
-                ChatMemberStatus.ADMINISTRATOR,
-                ChatMemberStatus.MEMBER
+            # ❌ अगर user joined नहीं है
+            if member.status in [
+                ChatMemberStatus.LEFT,
+                ChatMemberStatus.BANNED
             ]:
                 return False
 
