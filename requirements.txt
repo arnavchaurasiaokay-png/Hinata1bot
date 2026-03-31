@@ -7,4 +7,5 @@ python-dotenv
 pymongo
 dnspython
 # --- For-Web-Response ------- #
+flask
 aiohttp
