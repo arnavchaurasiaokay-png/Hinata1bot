@@ -1,0 +1,32 @@
+name: Mongo Backup
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # Roz 3 baje run hoga
+  workflow_dispatch:       # Manual run option bhi milega
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Install MongoDB Tools
+        run: sudo apt-get update && sudo apt-get install -y mongodb-database-tools
+
+      - name: Create Backup Folder
+        run: mkdir backup
+
+      - name: Run MongoDB Backup
+        run: mongodump --uri="${{ secrets.MONGO_URI }}" --out=backup
+
+      - name: Zip Backup
+        run: zip -r backup.zip backup
+
+      - name: Upload Backup
+        uses: actions/upload-artifact@v3
+        with:
+          name: mongodb-backup
+          path: backup.zip
