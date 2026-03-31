@@ -6,25 +6,32 @@ import asyncio
 from pyrogram import filters
 from pyrogram.enums import ChatMemberStatus
 from config import FORCE_SUB_CHANNELS, ADMINS, AUTO_DELETE_TIME, AUTO_DEL_SUCCESS_MSG
-from pyrogram.errors.exceptions.bad_request_400 import UserNotParticipant
 from pyrogram.errors import FloodWait
+from pyrogram.errors.exceptions.bad_request_400 import UserNotParticipant
 
 
-# 🔒 MULTIPLE FORCE SUB CHECK
-async def is_subscribed(filter, client, update):
+# 🔒 MULTIPLE FORCE SUB CHECK (FIXED)
+async def is_subscribed(filter, client, message):
+
+    # No force sub → allow
     if not FORCE_SUB_CHANNELS:
         return True
 
-    user_id = update.from_user.id
+    # Safety check
+    user = message.from_user
+    if not user:
+        return False
+
+    user_id = user.id
 
     # Admin bypass
     if user_id in ADMINS:
         return True
 
-    # Check all channels
+    # 🔒 Check ALL channels properly
     for ch in FORCE_SUB_CHANNELS:
         try:
-            member = await client.get_chat_member(chat_id=ch, user_id=user_id)
+            member = await client.get_chat_member(ch, user_id)
 
             if member.status not in [
                 ChatMemberStatus.OWNER,
@@ -36,7 +43,8 @@ async def is_subscribed(filter, client, update):
         except UserNotParticipant:
             return False
 
-        except Exception:
+        except Exception as e:
+            print(f"ForceSub Error: {e}")
             return False
 
     return True
@@ -46,8 +54,7 @@ async def is_subscribed(filter, client, update):
 async def encode(string):
     string_bytes = string.encode("ascii")
     base64_bytes = base64.urlsafe_b64encode(string_bytes)
-    base64_string = base64_bytes.decode("ascii").strip("=")
-    return base64_string
+    return base64_bytes.decode("ascii").strip("=")
 
 
 # 🔓 DECODE
@@ -55,8 +62,7 @@ async def decode(base64_string):
     base64_string = base64_string.strip("=")
     base64_bytes = (base64_string + "=" * (-len(base64_string) % 4)).encode("ascii")
     string_bytes = base64.urlsafe_b64decode(base64_bytes)
-    string = string_bytes.decode("ascii")
-    return string
+    return string_bytes.decode("ascii")
 
 
 # 📩 GET MESSAGES
@@ -74,7 +80,7 @@ async def get_messages(client, message_ids):
             )
 
         except FloodWait as e:
-            await asyncio.sleep(e.x)
+            await asyncio.sleep(e.value)
             msgs = await client.get_messages(
                 chat_id=client.db_channel.id,
                 message_ids=temb_ids
@@ -95,8 +101,7 @@ async def get_message_id(client, message):
     if message.forward_from_chat:
         if message.forward_from_chat.id == client.db_channel.id:
             return message.forward_from_message_id
-        else:
-            return 0
+        return 0
 
     elif message.forward_sender_name:
         return 0
@@ -156,7 +161,6 @@ async def delete_file(messages, client, process):
     for msg in messages:
         try:
             await client.delete_messages(chat_id=msg.chat.id, message_ids=[msg.id])
-
         except Exception as e:
             try:
                 await asyncio.sleep(e.x)
