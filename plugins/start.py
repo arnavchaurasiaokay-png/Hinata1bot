@@ -26,7 +26,8 @@ async def start_command(client: Client, message: Message):
 
     text = message.text
 
-    if len(text)>7:
+    # 🔗 FILE LINK SYSTEM
+    if len(text) > 7:
         try:
             base64_string = text.split(" ", 1)[1]
         except:
@@ -43,7 +44,7 @@ async def start_command(client: Client, message: Message):
                 return
 
             if start <= end:
-                ids = range(start,end+1)
+                ids = range(start, end+1)
             else:
                 ids = []
                 i = start
@@ -81,15 +82,32 @@ async def start_command(client: Client, message: Message):
             else:
                 caption = "" if not msg.caption else msg.caption.html
 
-            # 🔥 FINAL FIX (NO BUTTON TO USER)
             try:
-                sent = await client.send_cached_media(
-                    chat_id=user_id,
-                    file_id=msg.file_id,
-                    caption=caption,
-                    parse_mode=ParseMode.HTML,
-                    protect_content=PROTECT_CONTENT
-                )
+                file_id = None
+
+                if msg.document:
+                    file_id = msg.document.file_id
+                elif msg.video:
+                    file_id = msg.video.file_id
+                elif msg.audio:
+                    file_id = msg.audio.file_id
+                elif msg.photo:
+                    file_id = msg.photo.file_id[-1].file_id
+                elif msg.animation:
+                    file_id = msg.animation.file_id
+                elif msg.voice:
+                    file_id = msg.voice.file_id
+
+                if file_id:
+                    sent = await client.send_cached_media(
+                        chat_id=user_id,
+                        file_id=file_id,
+                        caption=caption,
+                        parse_mode=ParseMode.HTML,
+                        protect_content=PROTECT_CONTENT
+                    )
+                else:
+                    sent = await msg.copy(chat_id=user_id)
 
                 if AUTO_DELETE_TIME and AUTO_DELETE_TIME > 0 and sent:
                     track_msgs.append(sent)
@@ -98,7 +116,6 @@ async def start_command(client: Client, message: Message):
 
             except FloodWait as e:
                 await asyncio.sleep(e.value)
-                continue
             except:
                 continue
 
@@ -112,10 +129,11 @@ async def start_command(client: Client, message: Message):
         return
 
 
+    # 🏠 NORMAL START
     reply_markup = InlineKeyboardMarkup(
         [[
-            InlineKeyboardButton("😊 About Me", callback_data = "about"),
-            InlineKeyboardButton("🔒 Close", callback_data = "close")
+            InlineKeyboardButton("😊 About Me", callback_data="about"),
+            InlineKeyboardButton("🔒 Close", callback_data="close")
         ]]
     )
 
@@ -147,13 +165,13 @@ async def start_command(client: Client, message: Message):
         )
 
 
-# 🔒 NOT JOINED (UNCHANGED)
+# 🔒 NOT JOINED (PRIVATE FORCE SUB SAFE)
 @Bot.on_message(filters.command('start') & filters.private)
 async def not_joined(client: Client, message: Message):
 
     if bool(JOIN_REQUEST_ENABLE):
         invite = await client.create_chat_invite_link(
-            chat_id=FORCE_SUB_CHANNEL,
+            chat_id=FORCE_SUB_CHANNELS[0],
             creates_join_request=True
         )
         ButtonUrl = invite.invite_link
@@ -182,6 +200,7 @@ async def not_joined(client: Client, message: Message):
     )
 
 
+# 👥 USERS
 @Bot.on_message(filters.command('users') & filters.private & filters.user(ADMINS))
 async def get_users(client: Bot, message: Message):
     users = await full_userbase()
