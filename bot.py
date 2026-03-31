@@ -79,6 +79,54 @@ class Bot(Client):
 
         bind_address = "0.0.0.0"
         await web.TCPSite(app, bind_address, PORT).start()
+        from aiohttp import web
+import asyncio
+import os
+
+PORT = int(os.environ.get("PORT", 8080))
+
+async def start_web_server():
+    app = web.Application()
+
+    async def home(request):
+        return web.Response(text="Bot is alive!")
+
+    app.router.add_get("/", home)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+
+    print(f"Web server running on port {PORT}")
+
+    # 🔥 IMPORTANT: loop alive rakho
+    while True:
+        await asyncio.sleep(3600)
+        from aiohttp import web
+import asyncio
+import os
+
+PORT = int(os.environ.get("PORT", 8080))
+
+async def start_web_server():
+    app = web.Application()
+
+    async def home(request):
+        return web.Response(text="Bot is alive!")
+
+    app.router.add_get("/", home)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+
+    print(f"Web server running on port {PORT}")
+
+    # 🔥 IMPORTANT: loop alive rakho
+    while True:
+        await asyncio.sleep(3600)
 
     async def stop(self, *args):
         await super().stop()
