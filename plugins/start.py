@@ -19,8 +19,7 @@ if FORCE_SUB_CHANNELS:
     not_joined_channels = []
 
     for ch in FORCE_SUB_CHANNELS:
-        try:
-            member = await client.get_chat_member(ch, id)
+    member = await client.get_chat_member(ch, user_id)
             if member.status in ["left", "kicked"]:
                 not_joined_channels.append(ch)
         except:
