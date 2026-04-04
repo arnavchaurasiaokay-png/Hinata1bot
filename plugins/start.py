@@ -5,12 +5,13 @@ import secrets
 from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated, UserNotParticipant
+from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
 
 from bot import Bot
 from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, DISABLE_CHANNEL_BUTTON, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG, JOIN_REQUEST_ENABLE, FORCE_SUB_CHANNELS, SHORTNER_API
 from helper_func import subscribed, decode, get_messages, delete_file
 from database.database import add_user, del_user, full_userbase, present_user, save_token, get_token
+from pyrogram.errors import UserNotParticipant
 
 TOKEN_VALIDITY = 21600
 
@@ -154,3 +155,25 @@ async def start_command(client: Client, message: Message):
                 id=message.from_user.id
             )
         )
+
+
+# 🔥 CALLBACK
+@Bot.on_callback_query(filters.regex("check_join"))
+async def check_join_callback(client, query):
+
+    user_id = query.from_user.id
+
+    joined = await is_joined(client, user_id)
+
+    if not joined:
+        return await query.answer("❌ Join all channels first!", show_alert=True)
+
+    token = secrets.token_hex(8)
+    await save_token(token, user_id)
+
+    deep_link = f"https://t.me/{client.username}?start={token}"
+    short_url = f"{SHORTNER_API}{deep_link}"
+
+    await query.message.reply(
+        f"🔓 Get access here:\n{short_url}"
+    )
