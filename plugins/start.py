@@ -5,13 +5,12 @@ import secrets
 from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
+from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated, UserNotParticipant
 
 from bot import Bot
 from config import ADMINS, FORCE_MSG, START_MSG, CUSTOM_CAPTION, DISABLE_CHANNEL_BUTTON, PROTECT_CONTENT, START_PIC, AUTO_DELETE_TIME, AUTO_DELETE_MSG, JOIN_REQUEST_ENABLE, FORCE_SUB_CHANNELS, SHORTNER_API
 from helper_func import subscribed, decode, get_messages, delete_file
 from database.database import add_user, del_user, full_userbase, present_user, save_token, get_token
-from pyrogram.errors import UserNotParticipant
 
 TOKEN_VALIDITY = 21600
 
@@ -52,39 +51,42 @@ async def start_command(client: Client, message: Message):
     # 🔒 FORCE SUB
     if FORCE_SUB_CHANNELS and not token_valid:
         joined = await is_joined(client, id)
+
         if not joined:
             buttons = []
 
-            buttons = []
+            for ch in FORCE_SUB_CHANNELS:
+                try:
+                    member = await client.get_chat_member(ch, id)
 
-for ch in FORCE_SUB_CHANNELS:
-    try:
-        member = await client.get_chat_member(ch, message.from_user.id)
+                    # already joined → skip
+                    if member.status not in ["left", "kicked"]:
+                        continue
 
-        # ❌ agar already joined hai → skip
-        if member.status not in ["left", "kicked"]:
-            continue
+                    invite = await client.create_chat_invite_link(ch)
+                    buttons.append(
+                        [InlineKeyboardButton("Join Channel", url=invite.invite_link)]
+                    )
 
-        # ✅ only not joined channels
-        invite = await client.create_chat_invite_link(ch)
-        buttons.append(
-            [InlineKeyboardButton("Join Channel", url=invite.invite_link)]
-        )
+                except UserNotParticipant:
+                    invite = await client.create_chat_invite_link(ch)
+                    buttons.append(
+                        [InlineKeyboardButton("Join Channel", url=invite.invite_link)]
+                    )
 
-    except UserNotParticipant:
-        invite = await client.create_chat_invite_link(ch)
-        buttons.append(
-            [InlineKeyboardButton("Join Channel", url=invite.invite_link)]
-        )
+                except:
+                    pass
 
-    except:
-        pass
-
-
+            # 🔄 TRY AGAIN (same as before)
             try:
-                buttons.append(
-                    [InlineKeyboardButton("🔄 Try Again", url=f"https://t.me/{client.username}?start={text.split(' ',1)[1]}")]
-                )
+                if len(text.split()) > 1:
+                    buttons.append(
+                        [InlineKeyboardButton("🔄 Try Again", url=f"https://t.me/{client.username}?start={text.split(' ',1)[1]}")]
+                    )
+                else:
+                    buttons.append(
+                        [InlineKeyboardButton("🔄 Try Again", url=f"https://t.me/{client.username}")]
+                    )
             except:
                 pass
 
@@ -152,25 +154,3 @@ for ch in FORCE_SUB_CHANNELS:
                 id=message.from_user.id
             )
         )
-
-
-# 🔥 CALLBACK
-@Bot.on_callback_query(filters.regex("check_join"))
-async def check_join_callback(client, query):
-
-    user_id = query.from_user.id
-
-    joined = await is_joined(client, user_id)
-
-    if not joined:
-        return await query.answer("❌ Join all channels first!", show_alert=True)
-
-    token = secrets.token_hex(8)
-    await save_token(token, user_id)
-
-    deep_link = f"https://t.me/{client.username}?start={token}"
-    short_url = f"{SHORTNER_API}{deep_link}"
-
-    await query.message.reply(
-        f"🔓 Get access here:\n{short_url}"
-    )
