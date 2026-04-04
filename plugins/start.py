@@ -55,14 +55,30 @@ async def start_command(client: Client, message: Message):
         if not joined:
             buttons = []
 
-            for ch in FORCE_SUB_CHANNELS:
-                try:
-                    invite = await client.create_chat_invite_link(ch)
-                    buttons.append(
-                        [InlineKeyboardButton("Join Channel", url=invite.invite_link)]
-                    )
-                except:
-                    pass
+            buttons = []
+
+for ch in FORCE_SUB_CHANNELS:
+    try:
+        member = await client.get_chat_member(ch, message.from_user.id)
+
+        # ❌ agar already joined hai → skip
+        if member.status not in ["left", "kicked"]:
+            continue
+
+        # ✅ only not joined channels
+        invite = await client.create_chat_invite_link(ch)
+        buttons.append(
+            [InlineKeyboardButton("Join Channel", url=invite.invite_link)]
+        )
+
+    except UserNotParticipant:
+        invite = await client.create_chat_invite_link(ch)
+        buttons.append(
+            [InlineKeyboardButton("Join Channel", url=invite.invite_link)]
+        )
+
+    except:
+        pass
 
 
             try:
