@@ -80,6 +80,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+SHORTNER_API = os.environ.get("SHORTNER_API", "")
 
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 
