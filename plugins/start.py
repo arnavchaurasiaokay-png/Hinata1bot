@@ -64,9 +64,6 @@ async def start_command(client: Client, message: Message):
                 except:
                     pass
 
-            buttons.append(
-                [InlineKeyboardButton("✅ I Joined", callback_data="check_join")]
-            )
 
             try:
                 buttons.append(
